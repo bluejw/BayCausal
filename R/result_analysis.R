@@ -74,6 +74,11 @@ extract_P_star <- function(res) {
 post_process_L <- function(res, order_flag, pos_sign, cutoff = -Inf, remove_singleton = FALSE) {
   
   processed_res <- lapply(res, function(sample) {
+
+    # The stored zero column must not be counted as a latent factor.
+    if (isTRUE(sample$P_star == 0)) {
+      return(sample)
+    }
     
     if (is.finite(cutoff)) {
       sample$L[abs(sample$L) < cutoff] <- 0
@@ -101,6 +106,13 @@ post_process_L <- function(res, order_flag, pos_sign, cutoff = -Inf, remove_sing
 
     # Update P_star after any filtering
     sample$P_star <- if (ncol(sample$L) > 0) ncol(sample$L) else 0
+
+    if (sample$P_star == 0) {
+      sample$L <- matrix(0, nrow(sample$L), 1)
+      sample$sparsity_matrix <- matrix(0, nrow(sample$L), 1)
+      sample$pivot <- integer(0)
+      return(sample)
+    }
     
     if (pos_sign) {
       for (j in 1:ncol(sample$L)) {
@@ -163,6 +175,10 @@ post_process_L_mean <- function(L_mean, order_flag, pos_sign, cutoff = -Inf, rem
     keep_cols <- nnz_per_col > 1
     processed_L_mean <- processed_L_mean[, keep_cols, drop = FALSE]
     pivot <- pivot[keep_cols]
+  }
+
+  if (ncol(processed_L_mean) == 0) {
+    return(matrix(0, nrow(L_mean), 1))
   }
   
   if (pos_sign) {

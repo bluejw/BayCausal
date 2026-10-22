@@ -42,7 +42,11 @@ set_init_default <- function(seed, P_star, data, prior_lst){
   diag(L_uni_init) <- rnorm(Q,0,1)
   C_uni_init <- matrix(rnorm(n*Q,0,1), n, Q)
   sparsity_matrix_init <- matrix(1, Q, P_star)
-  pivot_init <- 1:P_star
+  pivot_init <- seq_len(P_star)
+  if(P_star == 0){
+    sparsity_matrix_init <- matrix(0, Q, 1)
+    C_init <- matrix(0, n, 1)
+  }
   
   a_init <- c(1,2)
   
@@ -79,7 +83,7 @@ set_init_default <- function(seed, P_star, data, prior_lst){
   L_init <- sparsity_matrix_init
   
   # initialize zeta
-  zeta_init <- update_zeta(a_init[1], a_init[2], sparsity_matrix_init, pivot_init, P_star, prior_lst)
+  zeta_init <- if(P_star == 0) numeric(0) else update_zeta(a_init[1], a_init[2], sparsity_matrix_init, pivot_init, P_star, prior_lst)
   
   # initialize tau
   for (i in 1:n){
@@ -132,7 +136,11 @@ set_init_default_wo_x <- function(seed, P_star, data, prior_lst){
   L_free_init <- matrix(rnorm(Q*(Q-1)), Q, Q-1)
   C_free_init <- matrix(rnorm(n*(Q-1),0,1), n, Q-1)
   sparsity_matrix_init <- matrix(1, Q, P_star)
-  pivot_init <- 1:P_star
+  pivot_init <- seq_len(P_star)
+  if(P_star == 0){
+    sparsity_matrix_init <- matrix(0, Q, 1)
+    C_init <- matrix(0, n, 1)
+  }
   
   a_init <- c(1,2)
   
@@ -160,7 +168,7 @@ set_init_default_wo_x <- function(seed, P_star, data, prior_lst){
   L_init <- sparsity_matrix_init
   
   # initialize zeta
-  zeta_init <- update_zeta(a_init[1], a_init[2], sparsity_matrix_init, pivot_init, P_star, prior_lst)
+  zeta_init <- if(P_star == 0) numeric(0) else update_zeta(a_init[1], a_init[2], sparsity_matrix_init, pivot_init, P_star, prior_lst)
   
   # initialize tau
   for (i in 1:n){

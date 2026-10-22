@@ -89,8 +89,8 @@ compute_psplit <- function(pivot, sparsity_matrix, ps, H){
   }
 
   # Check merge
-  ## See if this is still valid MCMC by adding (n_active_columns == 0 & n_sp_columns == 1)
-  if(n_sp_columns == 0  | (n_active_columns == 0 & n_sp_columns == 1)){
+  # The last singleton can merge into the zero-factor model.
+  if(n_sp_columns == 0){
     merge_applicable <- FALSE
   } else{
     merge_applicable <- TRUE

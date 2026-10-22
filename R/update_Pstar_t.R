@@ -45,11 +45,12 @@ update_P_star_split_t <- function(mu, A, B, L, C, sigma2, a1, a2, sparsity_matri
   # Sample U for dimension matching
   U <- runif(1,-1,1)
 
+  # At P_star = 0, replace the storage-only zero column.
   # Specify the new sparsity matrix and pivot
   pivot_new <- c(pivot, pivot_propose)
   column_new <- rep(0, Q)
   column_new[pivot_propose] <- 1
-  sparsity_matrix_new <- cbind(sparsity_matrix, column_new)
+  sparsity_matrix_new <- if(P_star == 0) matrix(column_new, Q, 1) else cbind(sparsity_matrix, column_new)
 
   # New sigma2
   # Variance conservation for Student-t: Kt = nu/(nu-2)
@@ -62,14 +63,14 @@ update_P_star_split_t <- function(mu, A, B, L, C, sigma2, a1, a2, sparsity_matri
 
   # New factor
   C_propose <- rnorm(n, 0, 1)
-  C_new <- cbind(C, C_propose)
+  C_new <- if(P_star == 0) matrix(C_propose, n, 1) else cbind(C, C_propose)
 
   # New loading
   Kt <- nu_t / (nu_t - 2.0)
   l_propose <- U*sqrt(Kt*sigma2[pivot_propose])
   L_propose <- rep(0, Q)
   L_propose[pivot_propose] <- l_propose
-  L_new <- cbind(L, L_propose)
+  L_new <- if(P_star == 0) matrix(L_propose, Q, 1) else cbind(L, L_propose)
 
   # log(Acceptance ratio) = log(Prior ratio) + log(Likelihood ratio) + log(Proposal ratio) + log(Jacobian)
   # log prior ratio, if using prior to propose factor, then cancelled out with the proposal ratio's factor component
@@ -87,9 +88,11 @@ update_P_star_split_t <- function(mu, A, B, L, C, sigma2, a1, a2, sparsity_matri
   loglik_new <- compute_loglik_rjmcmc_t_rcpp(pivot_propose, B, A, L_new, C_new, mu, sigma2_new, Y, X, nu_t)
   log_lik_ratio <- loglik_new - loglik_old
 
-  # log proposal ratio
-  q_split <- ps / (H - r - r_sp)
-  q_merge <- ps / (r_sp + 1)
+  # Use the actual move probabilities at the current and proposed states.
+  psplit_old <- compute_psplit(pivot, sparsity_matrix, ps, H)
+  psplit_new <- compute_psplit(pivot_new, sparsity_matrix_new, ps, H)
+  q_split <- psplit_old / (H - r - r_sp)
+  q_merge <- (1 - psplit_new) / (r_sp + 1)
   log_proposal_ratio <- log(2) + log(q_merge) - log(q_split)
 
   # Jacobian
@@ -147,6 +150,14 @@ update_P_star_merge_t <- function(mu, A, B, L, C, sigma2, a1, a2, sparsity_matri
   # New loading
   L_new <- L[,-column_merge, drop = FALSE]
 
+  # Keep one zero column for matrix operations, but no statistical factor.
+  if(P_star == 1){
+    L_new <- matrix(0, Q, 1)
+    C_new <- matrix(0, n, 1)
+    sparsity_matrix_new <- matrix(0, Q, 1)
+    pivot_new <- integer(0)
+  }
+
   # log(Acceptance ratio) = log(Prior ratio) + log(Likelihood ratio) + log(Proposal ratio) + log(Jacobian)
   # log prior ratio, if using prior to propose factor, then cancelled out with the proposal ratio's factor component
   prior_ratio_sigma2 <- dgamma(1/sigma2_propose, a_sigma, b_sigma, log = TRUE) - dgamma(1/sigma2[pivot_merge], a_sigma, b_sigma, log = TRUE)
@@ -163,9 +174,11 @@ update_P_star_merge_t <- function(mu, A, B, L, C, sigma2, a1, a2, sparsity_matri
   loglik_new <- compute_loglik_rjmcmc_t_rcpp(pivot_merge, B, A, L_new, C_new, mu, sigma2_new, Y, X, nu_t)
   log_lik_ratio <- loglik_new - loglik_old
 
-  # log proposal ratio
-  q_split <- ps / (H - r - r_sp + 1)
-  q_merge <- ps / (r_sp)
+  # Reverse split probability is evaluated at the proposed smaller model.
+  psplit_old <- compute_psplit(pivot, sparsity_matrix, ps, H)
+  psplit_new <- compute_psplit(pivot_new, sparsity_matrix_new, ps, H)
+  q_split <- psplit_new / (H - r - r_sp + 1)
+  q_merge <- (1 - psplit_old) / r_sp
   log_proposal_ratio <- log(q_split) - log(2) - log(q_merge)
 
   # Jacobian
